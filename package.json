@@ -1,0 +1,34 @@
+{
+  "name": "okey23",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "clean": "rm -rf dist && rm -f dist.zip",
+    "zip": "cd dist && zip -r ../dist.zip . -9 && cd .. && sh filesize.sh",
+    "dist": "pnpm build && pnpm zip",
+    "dev": "vite --port=3000",
+    "devc": "concurrently \"pnpm content\" \"pnpm dev\"",
+    "content": "node content.js",
+    "lint": "tsc --noEmit --watch",
+    "build": "pnpm clean && tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "blah": "link:..\\blah",
+    "lokey": "link:..\\lokey"
+  },
+  "devDependencies": {
+    "aset": "link:..\\aset",
+    "chokidar": "^3.5.3",
+    "concurrently": "^8.2.0",
+    "jspngopt": "^0.2.0",
+    "roadroller": "^2.1.0",
+    "rollup-plugin-sizes": "^1.0.5",
+    "rollup-plugin-visualizer": "^5.9.2",
+    "terser": "^5.19.0",
+    "typescript": "^5.1.6",
+    "vite": "^4.4.4",
+    "vite-plugin-glsl": "^1.1.2"
+  }
+}
