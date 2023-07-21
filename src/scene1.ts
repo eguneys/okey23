@@ -237,24 +237,44 @@ class TasStackPositioner {
     readonly s_width: number,
     readonly rects: number[] = []) {}
 
+  resolve_overlap(current_x: number, new_x: number): [number, number][] | undefined {
 
-  resolve_overlap(current_x: number, new_x: number): [number, number][] {
+    let { s_width, width } = this
+
+    if (new_x < 0 || new_x > s_width) {
+      return undefined
+    }
 
     let i = this.rects.findIndex(_ => Math.abs(current_x - _) < epsilon)
     if (current_x !== new_x && i !== -1) {
       this.rects.splice(i, 1)
     }
-    //this.rects.sort((a, b) => Math.abs(b - new_x) - Math.abs(a - new_x))
 
-    let { width } = this
+
 
     let res = []
     for (let rect of this.rects.slice(0)) {
       if (Math.abs(new_x - rect) < width) {
         if (new_x > rect) {
-          res.push(...this.resolve_overlap(rect, new_x - width))
+          let lo = this.resolve_overlap(rect, new_x - width)
+          if (!lo) {
+
+            if (current_x !== new_x) {
+              this.rects.push(current_x)
+            }
+            return undefined
+          }
+          res.push(...lo)
         } else {
-          res.push(...this.resolve_overlap(rect, new_x + width))
+          let ro = this.resolve_overlap(rect, new_x + width)
+          if (!ro) {
+            if (current_x !== new_x) {
+              this.rects.push(current_x)
+            }
+
+            return undefined
+          }
+            res.push(...ro)
         }
       }
     }
@@ -341,7 +361,11 @@ class TasStack extends Play {
   }
 
   add_tas(tas: Tas, i: Vec2) {
-    let [[x, a], ...rest] = this.p1.place(i.x)
+    let _ = this.p1.place(i.x)
+    if (!_) {
+      return false
+    }
+    let [[a, x], ...rest] = _
 
     let pp = Vec2.make(x, this.p_position.y)
     pp.x += this.p_position.x
@@ -351,7 +375,6 @@ class TasStack extends Play {
     tas.bind_drag((e: Vec2) => {
       this.data.on_front_drag(this, tas, e)
     })
-
 
     rest.forEach(([x, new_x]) => {
       let _ = this.taslar.find(_ => 
@@ -363,7 +386,8 @@ class TasStack extends Play {
 
     this.taslar.push(tas)
 
-    //console.log(x, this.p1.rects, rest, this.taslar.map(_ => _.f_position.x - this.p_position.x))
+    //console.log(i.x, x, this.p1.rects, rest, this.taslar.map(_ => _.f_position.x - this.p_position.x))
+    return true
   }
 
   add_taslar(taslar: Tas[]) {
@@ -428,12 +452,10 @@ class Okey23Play extends Play {
         //.div(Vec2.make(72 * 16, 102))
         
         if (self.dragging) {
-          let { stack } = self.dragging
 
           self.dragging.tas.drag_release()
-          if (stack) {
-            stack.revive_ghost(self.dragging.tas)
-          }
+          self.dragging.stack.revive_ghost(self.dragging.tas)
+
           self.dragging.dispose()
           self.dragging = undefined
           return true
@@ -449,7 +471,13 @@ class Okey23Play extends Play {
         this.dragging.stack?.hide_ghost()
 
 
-        stack.add_tas(this.dragging.tas, i.sub(this.dragging.tas.drag_decay))
+        this.dragging.tas.drag_release()
+        let res = stack.add_tas(this.dragging.tas, i.sub(this.dragging.tas.drag_decay))
+
+        if (!res) {
+          self.dragging.stack.revive_ghost(self.dragging.tas)
+        }
+
         this.dragging.dispose()
         this.dragging = undefined
       }
