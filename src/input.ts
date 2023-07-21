@@ -13,6 +13,7 @@ export type Hooks = {
   priority?: number,
   on_hover?: (e: EventPosition) => boolean,
   on_hover_clear?: () => void,
+  on_drag_hover?: (e: EventPosition) => void,
   on_up?: (e: EventPosition, right: boolean, m?: Vec2) => boolean,
   on_up_clear?: (e: EventPosition, m?: Vec2) => void,
   on_click?: (e: EventPosition, right: boolean) => boolean,
@@ -75,6 +76,10 @@ class Input {
     this.hooks.find(_ => _.on_drag?.(d, d0))
   }
 
+  _on_drag_hover(e: EventPosition) {
+    this.hooks.forEach(_ => _.on_drag_hover?.(e))
+  }
+
   listen(element: HTMLElement) {
 
     let _element_rect: ClientRect
@@ -132,6 +137,8 @@ class Input {
         _m = e
         if (!_drag) {
           self._on_hover(e)
+        } else {
+          self._on_drag_hover(e)
         }
       },
       _onDragEnd() {

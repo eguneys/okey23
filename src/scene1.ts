@@ -23,7 +23,33 @@ type DropHook = () => void
 
 class Tas extends Play {
 
+  rank?: Anim
   anim!: Anim
+
+
+  set tas(tas: OTas) {
+    this.rank?.dispose()
+
+    let [color, number] = tas
+
+    if (color === 'f') {
+
+      this.rank = this.make(Anim, Vec2.make(0, 0), {
+        name: `tas_bg`
+      })
+      this.rank.origin = Vec2.copy(this.anim.origin)
+
+      this.rank.play_now('fake')
+
+    } else {
+      this.rank = this.make(Anim, Vec2.make(0, -20), {
+        name: `${color}_numbers`
+      })
+      this.rank.origin = Vec2.make(23, 23)
+
+      this.rank.play_now(`l${number}`)
+    }
+  }
 
 
   _will_hover!: boolean
@@ -31,6 +57,9 @@ class Tas extends Play {
 
   set alpha(v: number) {
     this.anim.alpha = v
+    if (this.rank) {
+      this.rank.alpha = v
+    }
   }
 
   get easing() {
@@ -100,6 +129,14 @@ class Tas extends Play {
   _target_speed!: number
   _speed!: number
 
+  ease_rotation(r: number, duration: number = ticks.half) {
+    this._tr = this.tween_single(this._tr, [this.rotation, r], (v) => {
+      this.rotation = v
+    }, duration, 0, () => { 
+      this._tr = undefined
+    })
+  }
+
   ease_position(v: Vec2, duration: number = ticks.half) {
     if (v.equals(this.position)) {
       return
@@ -132,7 +169,6 @@ class Tas extends Play {
       name: 'tas_bg'
     })
     this.anim.origin = Vec2.make(36, 51)
-
 
     let self = this
     this.make(Clickable, Vec2.make(0, 0).sub(this.anim.origin), {
@@ -428,6 +464,38 @@ class DragTas extends Play {
 }
 
 
+type DropTasPlaceData = {
+  on_drag_hover: () => void
+  on_drag_hover_end: () => void
+}
+
+class DropTasPlace extends Play {
+
+  get data() {
+    return this._data as DropTasPlaceData
+  }
+
+  _init() {
+
+    let self = this
+    this.make(Clickable, Vec2.make(0, 0), {
+      rect: Rect.make(0, 0, 140, 160),
+      on_drag_hover(e: EventPosition) {
+        self.data.on_drag_hover()
+      },
+      on_drag_hover_end() {
+        self.data.on_drag_hover_end()
+      },
+      on_drop(e: Vec2, m: Vec2) {
+        
+        //console.log(e)
+      }
+    })
+
+  }
+}
+
+
 class Okey23Play extends Play {
 
   taslar!: Taslar
@@ -440,9 +508,6 @@ class Okey23Play extends Play {
     this.make(Anim, Vec2.zero, {
       name: 'play_bg'
     })
-
-
-
 
     let self = this
     this.make(Clickable, Vec2.make(0, 0), {
@@ -475,7 +540,7 @@ class Okey23Play extends Play {
         let res = stack.add_tas(this.dragging.tas, i.sub(this.dragging.tas.drag_decay))
 
         if (!res) {
-          self.dragging.stack.revive_ghost(self.dragging.tas)
+          this.dragging.stack.revive_ghost(this.dragging.tas)
         }
 
         this.dragging.dispose()
@@ -498,7 +563,6 @@ class Okey23Play extends Play {
     this.stack = this.make(TasStack, Vec2.make(400, 780), {
       on_front_drop,
       on_front_drag
-      
     })
     this.stack2 = this.make(TasStack, Vec2.make(400, 910), {
       on_front_drop,
@@ -508,25 +572,31 @@ class Okey23Play extends Play {
     this.stack.set_ghost(this.taslar.borrow())
     this.stack2.set_ghost(this.taslar.borrow())
 
-    this.stack.add_taslar([
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-      this.taslar.borrow(),
-    ])
 
 
+    this.make(DropTasPlace, Vec2.make(1420, 550), {
+      on_drag_hover() {
+        if (self.dragging) {
+          self.dragging.tas.ease_rotation(-Math.PI * 0.2)
+        }
+      },
+      on_drag_hover_end() {
+        if (self.dragging) {
+          self.dragging.tas.ease_rotation(0)
+        }
+      }
+    })
+
+  }
+
+
+  load_taslar(taslar: OTas[]) {
+    this.stack.add_taslar(taslar.map(_ => {
+      let res = this.taslar.borrow()
+
+      res.tas = _
+      return res
+    }))
   }
 }
 
@@ -538,6 +608,12 @@ export class SceneTransition extends Play {
   _init() {
 
     this.current = this.make(Okey23Play, Vec2.zero, {})
+
+    let o = DuzOkey4.deal()
+    let my_board = o.pov(1).stacks[0].board
+
+    ;(this.current as Okey23Play).load_taslar(my_board)
+
   }
 
   _draw(batch: Batch) {
