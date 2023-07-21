@@ -12,8 +12,10 @@ import Input, { EventPosition, DragEvent } from './input'
 
 import { Game, RectView, Clickable } from './game'
 
-import { taslar, DuzOkey4, Tas as OTas } from 'lokey'
 import { Tween } from './tween'
+
+import { taslar, DuzOkey4, Tas as OTas } from 'lokey'
+
 
 let epsilon = 2
 
@@ -255,7 +257,7 @@ class Taslar extends Play {
   }
 
   _init() {
-    this.frees = taslar.slice(0, 20).map(tas => {
+    this.frees = [...Array(20).keys()].map(tas => {
       let _ = this.make(Tas, Vec2.zero, {})
       _.visible = false
       return _
