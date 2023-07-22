@@ -1,9 +1,26 @@
-import { DuzOkey4Pov, sides, Side, Event as OkeyEvent, taslar, DuzOkey4, Tas as OTas } from 'lokey'
+import { ChangeState } from 'lokey'
 
-type Send = (_: string) => void
+import { Dests, Events, DuzOkey4Pov, sides, Side, Event as OkeyEvent, taslar, DuzOkey4, Tas as OTas } from 'lokey'
 
 
-abstract class DuzOkey4PovWatcher implements OkeyHooks {
+class DuzAi {
+  static make = new DuzAi()
+
+  async out(pov: DuzOkey4Pov) {
+    let tas = pov.stacks[0].board[0]
+    return `out ${tas}`
+  }
+
+  async draw(pov: DuzOkey4Pov) {
+    return 'draw'
+  }
+}
+
+
+type Send = (_?: string) => void
+
+
+export abstract class DuzOkey4PovWatcher implements OkeyHooks {
 
   send!: Send
 
@@ -11,7 +28,7 @@ abstract class DuzOkey4PovWatcher implements OkeyHooks {
     this.send = _send
   }
 
-  abstract on_events(pov: DuzOkey4Pov, events: OkeyEvent[]): void
+  abstract on_events(pov: DuzOkey4Pov, events: OkeyEvent[], dests: Dests): void
 }
 
 
@@ -28,12 +45,34 @@ class DuzOkey4AiPlayer extends DuzOkey4PovWatcher {
 
   static make = () => new DuzOkey4AiPlayer()
 
-  on_events(pov: DuzOkey4Pov, events: OkeyEvent[]) {
+  ai: DuzAi = DuzAi.make
+
+  send_sometime(s: string) {
+    setTimeout(() => this.send(s), 400 + 800 * Math.random())
+  }
+
+  on_events(pov: DuzOkey4Pov, events: OkeyEvent[], dests: Dests) {
+  
+    let { ai } = this
+
+    events.forEach(_ => _.patch_pov(pov))
+
+    let my_state = pov.action_side === 1
+
+    if (my_state) {
+      if (dests.draw) {
+        ai.draw(pov).then(_ => this.send_sometime(_))
+      } else if (dests.out) { // out
+        ai.out(pov).then(_ => this.send_sometime(_))
+      }
+    }
   }
 }
 
 
-class SinglePlayerDuzOkey4 {
+export class SinglePlayerDuzOkey4 {
+
+  static make = (hooks: DuzOkey4PovWatcher) => new SinglePlayerDuzOkey4(hooks)
 
 
   hooks: DuzOkey4Hooks
@@ -56,8 +95,8 @@ class SinglePlayerDuzOkey4 {
 
 
 interface OkeyHooks {
-  set_send: (send: (action: string) => void) => void;
-  on_events: (pov0: DuzOkey4Pov, events: OkeyEvent[]) => void;
+  set_send: (send: Send) => void;
+  on_events: (pov0: DuzOkey4Pov, events: OkeyEvent[], dests: Dests) => void;
 }
 
 class DuzOkey4Hooks {
@@ -77,6 +116,8 @@ class DuzOkey4Hooks {
         hooks[side].set_send(_ => this.act(_)))
 
       spec.set_send(_ => this.act(_))
+
+      this.act()
     }
 
   pov(s: Side) {
@@ -87,15 +128,16 @@ class DuzOkey4Hooks {
     return this.okey.dests
   }
 
-  act(action: string) {
+  act(action?: string) {
     let povs = sides.map(side => this.okey.pov(side))
-    let events = this.okey.act(action)
+    let events = action ? this.okey.act(action) : new Events()
 
+    let { dests } = this.okey
 
 
     sides.forEach((side, i) => 
-                  this.hooks[side].on_events(povs[i], events.pov(side)))
-    this.spec.on_events(povs[0], events.spec)
+                  this.hooks[side].on_events(povs[i], events.pov(side), dests))
+    this.spec.on_events(povs[0], events.spec, dests)
   }
 
 }

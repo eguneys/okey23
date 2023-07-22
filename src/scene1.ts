@@ -14,7 +14,29 @@ import { Game, RectView, Clickable } from './game'
 
 import { Tween } from './tween'
 
-import { taslar, DuzOkey4, Tas as OTas } from 'lokey'
+import { Side, Dests, Event as OkeyEvent, taslar, DuzOkey4, DuzOkey4Pov, Tas as OTas } from 'lokey'
+
+import { SinglePlayerDuzOkey4, DuzOkey4PovWatcher } from './okey_hooks'
+
+import { DuzState, ChangeState, OutTas } from 'lokey'
+
+
+class DuzOkey4PlayPlayer extends DuzOkey4PovWatcher {
+
+  static make = (okey: Okey23Play) => new DuzOkey4PlayPlayer(okey)
+
+  constructor(readonly okey: Okey23Play) {
+    super()
+
+    okey.set_player(this)
+  }
+
+  on_events(pov: DuzOkey4Pov, events: OkeyEvent[], dests: Dests) {
+    this.okey.sync_check_pov(pov)
+    events.forEach(e => this.okey.patch_event_pov(e))
+    this.okey.set_dests(dests)
+  }
+}
 
 
 let epsilon = 2
@@ -28,9 +50,19 @@ class Tas extends Play {
   rank?: Anim
   anim!: Anim
 
+  _tas?: OTas
 
-  set tas(tas: OTas) {
+  get tas() {
+    return this._tas
+  }
+
+  set tas(tas: OTas | undefined) {
+    this._tas = tas
     this.rank?.dispose()
+
+    if (!tas) {
+      return
+    }
 
     let [color, number] = tas
 
@@ -257,7 +289,7 @@ class Taslar extends Play {
   }
 
   _init() {
-    this.frees = [...Array(20).keys()].map(tas => {
+    this.frees = [...Array(106).keys()].map(tas => {
       let _ = this.make(Tas, Vec2.zero, {})
       _.visible = false
       return _
@@ -435,6 +467,7 @@ class TasStack extends Play {
 
 class DragTas extends Play {
 
+  side?: true
   _stack?: TasStack
 
   set stack(stack: TasStack) {
@@ -463,12 +496,25 @@ class DragTas extends Play {
     let _v = v.sub(_.drag_decay)
     _.lerp_position(_v, 1)
   }
+
+  cancel_dispose() {
+    this.tas.drag_release()
+    this.stack.revive_ghost(this.tas)
+
+    this.dispose()
+  }
+
+
+  out_dispose() {
+    this.dispose()
+  }
 }
 
 
 type DropTasPlaceData = {
   on_drag_hover: () => void
   on_drag_hover_end: () => void
+  on_drop: () => boolean
 }
 
 class DropTasPlace extends Play {
@@ -489,11 +535,177 @@ class DropTasPlace extends Play {
         self.data.on_drag_hover_end()
       },
       on_drop(e: Vec2, m: Vec2) {
-        
-        //console.log(e)
+        return self.data.on_drop()
       }
     })
 
+  }
+}
+
+class TurnFrame extends Play {
+
+  _init() {
+
+    let anim = this.make(Anim, Vec2.zero, {
+      name: 'turn_frame'
+    })
+
+    anim.origin = Vec2.make(358, 187).scale(0.5)
+  }
+}
+
+class TurnFrames extends Play {
+
+  tf_1!: TurnFrame
+  tf_2!: TurnFrame
+  tf_3!: TurnFrame
+  tf_4!: TurnFrame
+
+  _init() {
+
+    this.tf_1 = this.make(TurnFrame, Vec2.make(940, 690), {})
+    this.tf_2 = this.make(TurnFrame, Vec2.make(1710, 390), {})
+    this.tf_2.rotation = -Math.PI / 2
+
+    this.tf_3 = this.make(TurnFrame, Vec2.make(900, 140), {})
+    this.tf_3.rotation = - Math.PI
+    this.tf_4 = this.make(TurnFrame, Vec2.make(200, 420), {})
+    this.tf_4.rotation = - Math.PI * 1.5
+  }
+
+
+  set_state(side: Side, state: DuzState) {
+    if (state !== ' ') {
+      this.set_turn(side)
+    }
+  }
+
+  set_turn(side: Side) {
+
+    this.tf_1.visible = false
+    this.tf_2.visible = false
+    this.tf_3.visible = false
+    this.tf_4.visible = false
+
+
+    if (side === 1) {
+      this.tf_1.visible = true
+    } else if (side === 2) {
+      this.tf_2.visible = true
+    } else if (side === 3) {
+      this.tf_3.visible = true
+    } else if (side === 4) {
+      this.tf_4.visible = true
+    }
+  }
+}
+
+class TurnArrow extends Play {
+  _init() {
+    let anim = this.make(Anim, Vec2.zero, {
+      name: 'turn_arrow'
+    })
+
+    anim.origin = Vec2.make(112, 112).scale(0.5)
+  }
+}
+
+class TurnArrows extends Play {
+
+  draw_arrow!: TurnArrow
+  draw_side_arrow!: TurnArrow
+  out_arrow!: TurnArrow
+
+  _init() {
+
+    this.draw_side_arrow = this.make(TurnArrow, Vec2.make(560, 700), {})
+    this.draw_side_arrow.rotation = -Math.PI * 1.2
+    this.draw_arrow = this.make(TurnArrow, Vec2.make(1100, 600), {})
+    this.draw_arrow.rotation = -Math.PI * 0.95
+    this.out_arrow = this.make(TurnArrow, Vec2.make(1400, 700), {})
+    this.out_arrow.rotation = Math.PI * 0.2
+
+  }
+
+  set_dests(dests?: Dests) {
+    this.draw_arrow.visible = false
+    this.draw_side_arrow.visible = false
+    this.out_arrow.visible = false
+
+    if (dests?.draw) {
+      this.draw_arrow.visible = true
+      this.draw_side_arrow.visible = true
+    }
+    if (dests?.out) {
+      this.out_arrow.visible = true
+    }
+  }
+}
+
+class OutWaste extends Play {
+
+  taslar!: Tas[]
+
+  _init() {
+    this.taslar = []
+  }
+
+  add_tas(tas: Tas) {
+    tas.send_front()
+    this.taslar.push(tas)
+  }
+}
+
+type OutWastesData = {
+  on_drag_side: (tas: Tas, v: Vec2) => void
+}
+
+class OutWastes extends Play {
+
+  get data() {
+    return this._data as OutWastesData
+  }
+
+  wastes!: OutWaste[]
+
+  _init() {
+    this.wastes = [
+      this.make(OutWaste, Vec2.zero, {}),
+      this.make(OutWaste, Vec2.zero, {}),
+      this.make(OutWaste, Vec2.zero, {}),
+      this.make(OutWaste, Vec2.zero, {})
+    ]
+  }
+
+  add_tas(side: Side, tas: Tas, cancel?: true) {
+    this.wastes[side - 1].add_tas(tas)
+    tas.bind_drag()
+    if (side === 1) {
+      tas.ease_rotation(-Math.PI * 0.2)
+      tas.ease_position(Vec2.make(1480, 620))
+    } else if (side === 2) {
+      tas.position = Vec2.make(1652, 410)
+      tas.ease_rotation(-Math.PI * 0.7)
+      tas.ease_position(Vec2.make(1422, 300))
+    } else if (side === 3) {
+      tas.position = Vec2.make(890, 160)
+      tas.ease_rotation(-Math.PI * 1.2)
+      tas.ease_position(Vec2.make(500, 300))
+    } else if (side === 4) {
+      if (!cancel) {
+        tas.position = Vec2.make(230, 410)
+      }
+      tas.ease_rotation(Math.PI * 0.1)
+      tas.ease_position(Vec2.make(426, 625))
+
+      let previous = this.wastes[3].taslar[this.wastes[3].taslar.length - 2]
+      if (previous) {
+        previous.bind_drag()
+      }
+      tas.bind_drag((e) => {
+        this.data.on_drag_side(tas, e)
+      })
+    }
   }
 }
 
@@ -506,10 +718,22 @@ class Okey23Play extends Play {
 
   dragging?: DragTas
 
+  side_dragging?: DragTas
+
+  turn_frames!: TurnFrames
+  turn_arrows!: TurnArrows
+
+  out_wastes!: OutWastes
+
   _init() {
     this.make(Anim, Vec2.zero, {
       name: 'play_bg'
     })
+
+
+    this.turn_frames = this.make(TurnFrames, Vec2.zero, {})
+    this.turn_arrows = this.make(TurnArrows, Vec2.zero, {})
+
 
     let self = this
     this.make(Clickable, Vec2.make(0, 0), {
@@ -518,14 +742,34 @@ class Okey23Play extends Play {
         let i = m.mul(Game.v_screen).sub(self.g_position)
         //.div(Vec2.make(72 * 16, 102))
         
+        if (self.side_dragging) {
+
+          self.side_dragging.tas.drag_release()
+          self.out_wastes.add_tas(4, self.side_dragging.tas, true)
+
+          self.side_dragging.dispose()
+          self.side_dragging = undefined
+
+        }
+
+
         if (self.dragging) {
-
-          self.dragging.tas.drag_release()
-          self.dragging.stack.revive_ghost(self.dragging.tas)
-
-          self.dragging.dispose()
+          self.dragging.cancel_dispose()
           self.dragging = undefined
           return true
+        }
+      }
+    })
+
+    this.out_wastes = this.make(OutWastes, Vec2.zero, {
+      on_drag_side(tas: Tas, v: Vec2) {
+        if (self.side_dragging) {
+          self.side_dragging.drag(v)
+        } else {
+          self.side_dragging = self.make(DragTas, Vec2.zero, {})
+          self.side_dragging.side = true
+          self.side_dragging.tas = tas
+          tas.ease_rotation(0)
         }
       }
     })
@@ -533,6 +777,23 @@ class Okey23Play extends Play {
     this.taslar = this.make(Taslar, Vec2.zero, {})
 
     const on_front_drop = (stack: TasStack, i: Vec2) => {
+      if (this.side_dragging) {
+
+        this.side_dragging.tas.drag_release()
+
+        let res = stack.add_tas(this.side_dragging.tas, i.sub(this.side_dragging.tas.drag_decay))
+        if (!res) {
+          this.out_wastes.add_tas(4, this.side_dragging.tas, true)
+        } else {
+        
+          this.send('draw s')
+        }
+
+
+        this.side_dragging.dispose()
+        this.side_dragging = undefined
+
+      }
       if (this.dragging) {
 
         this.dragging.stack?.hide_ghost()
@@ -586,13 +847,74 @@ class Okey23Play extends Play {
         if (self.dragging) {
           self.dragging.tas.ease_rotation(0)
         }
+      },
+      on_drop() {
+        if (self.dragging) {
+
+          let { action_side } = self._pov
+
+          if (action_side === 1 && self.dests.out) {
+
+            self.send(`out ${self.dragging.tas.tas}`)
+
+            self.dragging.tas.drag_release()
+            //self.taslar.release(self.dragging.tas)
+            self.out_wastes.add_tas(1, self.dragging.tas)
+            self.dragging.out_dispose()
+            self.dragging = undefined
+
+
+            return true
+          } else {
+            return false
+          }
+        }
       }
     })
+  }
 
+  dests!: Dests
+  set_dests(dests: Dests) {
+    let { action_side } = this._pov
+
+    this.dests = dests
+    this.turn_arrows.set_dests(action_side === 1 ? dests : undefined)
+  }
+
+  private sync_load_pov() {
+    let { action_side, okey, stacks, end_tas } = this._pov
+
+    let { state, board, waste } = stacks[0]
+
+    let wastes = stacks.map(_ => _.waste)
+    let states = stacks.map(_ => _.state)
+
+
+    this.load_taslar(board)
+
+    this.turn_frames.set_turn(action_side)
+  }
+
+  private apply_event(e: OkeyEvent) {
+    if (e instanceof ChangeState) {
+      let { side, state } = e
+
+      this.turn_frames.set_state(side, state)
+    }
+    if (e instanceof OutTas) {
+      if (e.side === 1) {
+        return
+      }
+      let tas = this.taslar.borrow()
+      tas.tas = e.tas
+      this.out_wastes.add_tas(
+        e.side, 
+        tas)
+    }
   }
 
 
-  load_taslar(taslar: OTas[]) {
+  private load_taslar(taslar: OTas[]) {
     this.stack.add_taslar(taslar.map(_ => {
       let res = this.taslar.borrow()
 
@@ -600,6 +922,32 @@ class Okey23Play extends Play {
       return res
     }))
   }
+
+
+  _pov!: DuzOkey4Pov
+
+  sync_check_pov(pov: DuzOkey4Pov) {
+    if (!this._pov || this._pov.fen !== pov.fen) {
+      this._pov = pov
+      this.sync_load_pov()
+    }
+  }
+
+  patch_event_pov(e: OkeyEvent) {
+    e.patch_pov(this._pov)
+    this.apply_event(e)
+  }
+
+
+  player!: DuzOkey4PlayPlayer
+  set_player(player: DuzOkey4PlayPlayer) {
+    this.player = player
+  }
+
+  send(action: string) {
+    this.player.send(action)
+  }
+
 }
 
 
@@ -611,10 +959,8 @@ export class SceneTransition extends Play {
 
     this.current = this.make(Okey23Play, Vec2.zero, {})
 
-    let o = DuzOkey4.deal()
-    let my_board = o.pov(1).stacks[0].board
-
-    ;(this.current as Okey23Play).load_taslar(my_board)
+    SinglePlayerDuzOkey4.make(
+      DuzOkey4PlayPlayer.make(this.current as Okey23Play))
 
   }
 
