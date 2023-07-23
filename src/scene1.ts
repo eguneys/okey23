@@ -10,7 +10,7 @@ import Content from './content'
 import { Anim } from './anim'
 import Input, { EventPosition, DragEvent } from './input'
 
-import { Game, RectView, Clickable } from './game2'
+import { RectView, Clickable } from './game2'
 
 import { Tween } from './tween'
 
@@ -19,6 +19,8 @@ import { sides, Side, Dests, Event as OkeyEvent, taslar, DuzOkey4, DuzOkey4Pov, 
 import { SinglePlayerDuzOkey4, DuzOkey4PovWatcher } from './okey_hooks'
 
 import { DuzState, ChangeState, OutTas, DrawTas } from 'lokey'
+
+import { Game, TransText } from './game'
 
 
 class DuzOkey4PlayPlayer extends DuzOkey4PovWatcher {
@@ -805,7 +807,24 @@ class MiddleDraw extends Play {
   tas?: Tas
   tas2?: Tas
 
+  nb_middle_text!: TransText
+
+  set nb_middle(nb: number) {
+    this.nb_middle_text.text = `${nb}`
+  }
+
   _init() {
+
+    
+    this.nb_middle_text = this.make(TransText, Vec2.make(0, -40), {
+      no_trans: true,
+      width: 64,
+      height: 64,
+      key: `99`,
+      center: true,
+      color: Color.hex(0x4a4a4a)
+    })
+
   }
 
   sync_release_taslar() {
@@ -836,7 +855,6 @@ class MiddleDraw extends Play {
       let self = this
       this.tas.bind_drag((e: Vec2) => {
         if (self.data.on_middle_drag(self.tas!, e)) {
-
         }
       })
     }
@@ -947,6 +965,9 @@ export class Okey23Play extends Play {
       }
     })
 
+
+    this.taslar = this.make(Taslar, Vec2.zero, {})
+
     this.middle_draw = this.make(MiddleDraw, Vec2.make(1085, 480), {
       on_middle_drag(tas: Tas, v: Vec2) {
         if (self.middle_dragging) {
@@ -956,6 +977,7 @@ export class Okey23Play extends Play {
             self.middle_dragging = self.make(DragTas, Vec2.zero, {})
             self.middle_dragging.middle = true
             self.middle_dragging.tas = tas
+            tas.send_front()
             tas.ease_rotation(0)
 
             self.send('draw')
@@ -967,9 +989,6 @@ export class Okey23Play extends Play {
         return false
       }
     })
-
-    this.taslar = this.make(Taslar, Vec2.zero, {})
-
 
     const on_front_drop = (stack: TasStack, i: Vec2) => {
       if (this.middle_dragging) {
@@ -1083,6 +1102,10 @@ export class Okey23Play extends Play {
     return this._pov.action_side === 1 && this.dests.out
   }
 
+  private sync_update_nb_middle() {
+    this.middle_draw.nb_middle = this.nb_middle_taslar
+  }
+
   private sync_release_taslar() {
 
     let taslar = [
@@ -1143,6 +1166,7 @@ export class Okey23Play extends Play {
   private set_draw_tas(tas: OTas) {
     if (this.middle_dragging) {
       this.middle_dragging.tas.tas = tas
+      this.middle_dragging.tas.flipped = false
     }
   }
 
@@ -1168,9 +1192,11 @@ export class Okey23Play extends Play {
 
     this.middle_draw.set_tas(this.taslar.borrow(), this.taslar.borrow())
     this.turn_frames.set_turn(action_side)
+
+    this.sync_update_nb_middle()
   }
 
-  private apply_event(e: OkeyEvent) {
+  private before_apply_event(e: OkeyEvent) {
     if (e instanceof ChangeState) {
       let { side, state } = e
 
@@ -1191,6 +1217,19 @@ export class Okey23Play extends Play {
         this.set_draw_tas(e.tas!)
       }
     }
+
+  }
+
+  private after_apply_event(e: OkeyEvent) {
+    if (e instanceof ChangeState) {
+      let { side, state } = e
+      if (state === ' ') {
+        return
+      }
+
+    }
+
+    this.sync_update_nb_middle()
   }
 
 
@@ -1211,17 +1250,18 @@ export class Okey23Play extends Play {
 
   sync_check_pov(pov: DuzOkey4Pov) {
     if (!this._pov || this._pov.fen !== pov.fen) {
-      console.log('sync load pov', 
-                  this._pov?.fen, 
-                  pov.fen)
+      if (this._pov) {
+        console.log('sync load pov', this._pov.fen, pov.fen)
+      }
       this._pov = pov
       this.sync_load_pov()
     }
   }
 
   patch_event_pov(e: OkeyEvent) {
-    this.apply_event(e)
+    this.before_apply_event(e)
     e.patch_pov(this._pov)
+    this.after_apply_event(e)
   }
 
 
@@ -1237,21 +1277,9 @@ export class Okey23Play extends Play {
 }
 
 
-export class SceneTransition extends Play {
-
-  current!: Play
+export class Scene1 extends Play {
 
   _init() {
-
-    this.current = this.make(Okey23Play, Vec2.zero, {})
+    Game.scene_transition.next(Okey23Play)
   }
-
-  _draw(batch: Batch) {
-
-    this.current.draw(batch)
-    batch.render(App.backbuffer)
-    batch.clear()
-  }
-
-
 }

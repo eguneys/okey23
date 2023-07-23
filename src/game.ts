@@ -25,10 +25,6 @@ import Trans, { languages } from './trans'
 
 import { GeneralStore } from './store'
 
-import { Okey23Play } from './scene1'
-
-
-
 type RectData = {
   w: number,
   h: number,
@@ -345,7 +341,7 @@ class MainSideBarItem extends Play {
         text.color = Color.white
       },
       on_click() {
-        scene_transition.next(self.data.next)
+        Game.scene_transition.next(self.data.next)
       },
       rect: Rect.make(0, 0, this.width - 16, this.height - 16)
     })
@@ -638,7 +634,7 @@ export class About2 extends Play {
     this.make(Navigation2, Vec2.zero, {
       key: 'about',
       on_back() {
-        scene_transition.next(self.data.on_back ?? MainMenu2)
+        Game.scene_transition.next(self.data.on_back ?? MainMenu2)
       }
     })
 
@@ -1005,6 +1001,7 @@ export class Text extends Play {
 
   set text(text: string) {
     this.data.text = text
+    this.origin = this.data.center ? Vec2.make(this.width / 2, 0) : Vec2.zero
   }
 
   _size!: number
@@ -1526,7 +1523,7 @@ export class HowtoPlay2 extends Play {
     this.make(Navigation2, Vec2.zero, {
       key: 'how_to_play',
       on_back() {
-        scene_transition.next(self.data.on_back ?? MainMenu2)
+        Game.scene_transition.next(self.data.on_back ?? MainMenu2)
       }
     })
 
@@ -2029,7 +2026,7 @@ export class Settings2 extends Play {
     this.make(Navigation2, Vec2.zero, {
       key: 'settings',
       on_back() {
-        scene_transition.next(self.data.on_back ?? MainMenu2)
+        Game.scene_transition.next(self.data.on_back ?? MainMenu2)
       }
     })
 
@@ -2229,7 +2226,7 @@ export class MainMenu2 extends Play {
     this.make(MainSideButton, Vec2.make(1300, side_y), {
       text: 'how_to_play',
       on_click() {
-        scene_transition.next(HowtoPlay2)
+        Game.scene_transition.next(HowtoPlay2)
       }
     })
 
@@ -2242,14 +2239,14 @@ export class MainMenu2 extends Play {
     this.make(MainSideButton, Vec2.make(1300, side_y + side_h * 2), {
       text: 'settings',
       on_click() {
-        scene_transition.next(Settings2)
+        Game.scene_transition.next(Settings2)
       }
     })
 
     this.make(MainSideButton, Vec2.make(1300, side_y + side_h * 3), {
       text: 'about',
       on_click() {
-        scene_transition.next(About2)
+        Game.scene_transition.next(About2)
       }
     })
 
@@ -2269,7 +2266,7 @@ class SceneTransition extends Play {
   target2!: Target
 
   mask?: TransitionMask
-  current!: Play
+  current?: Play
   _next?: Play
 
   next<T extends Play>(ctor: { new(...args: any[]): T}, position: Vec2 = Vec2.zero, data: any = {}) {
@@ -2288,16 +2285,6 @@ class SceneTransition extends Play {
 
     this.theme_target = Target.create(Game.width, Game.height)
 
-    //this.current = this._make(CardShowcase, Vec2.zero, {})
-    // this.current = this._make(MainMenu, Vec2.zero, {})
-    //this.current = this._make(Statistics, Vec2.zero, {})
-    // this.current = this._make(MainMenu2, Vec2.zero, {})
-    //this.current = this._make(HowtoPlay2, Vec2.zero, {})
-    //this.current = this._make(Settings2, Vec2.zero, {})
-    //this.current = this._make(About2, Vec2.zero, {})
-
-    this.current = this._make(Okey23Play, Vec2.zero, {})
-
     transition.set_matrix(Mat3x2.create_scale_v(Game.v_screen))
     pallette.set_matrix(Mat3x2.create_scale_v(Game.v_screen))
 
@@ -2306,15 +2293,15 @@ class SceneTransition extends Play {
   _update() {
 
     this._next?.update()
-    this.current.update()
+    this.current?.update()
 
     this.mask?.update()
 
     if (this.mask?.done) {
-      this.current.dispose()
+      this.current?.dispose()
       this.mask.dispose()
       this.mask = undefined
-      this.current = this._next!
+      this.current = this._next
       this._next = undefined
     }
   }
@@ -2322,15 +2309,18 @@ class SceneTransition extends Play {
   _draw(batch: Batch) {
 
     if (!this._next) {
-      this.current.draw(batch)
-
-      batch.render(this.theme_target)
-      batch.clear()
+      if (this.current) {
+        this.current.draw(batch)
+        batch.render(this.theme_target)
+        batch.clear()
+      }
     } else {
 
-      this.current.draw(batch)
-      batch.render(this.target)
-      batch.clear()
+      if (this.current) {
+        this.current.draw(batch)
+        batch.render(this.target)
+        batch.clear()
+      }
 
       this._next.draw(batch)
       batch.render(this.target2)
@@ -2354,9 +2344,17 @@ class SceneTransition extends Play {
   }
 }
 
-export let scene_transition: SceneTransition
+type GameData = {
+  on_content_loaded: () => void
+}
 
-export default class Game extends Play {
+export class Game extends Play {
+
+  get data() {
+    return this._data as GameData
+  }
+
+  static scene_transition: SceneTransition
 
   static width = 1920
   static height = 1080
@@ -2370,12 +2368,13 @@ export default class Game extends Play {
     this.objects = []
 
     Sound.load().then(() => {
-      console.log(Sound)
+      //console.log(Sound)
     })
 
     Content.load().then(() => {
       Trans.language = GeneralStore.language
-      scene_transition = this.make(SceneTransition, Vec2.zero, {})
+      Game.scene_transition = this.make(SceneTransition, Vec2.zero, {})
+      this.data.on_content_loaded()
     })
   }
 

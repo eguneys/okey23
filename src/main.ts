@@ -1,20 +1,23 @@
 import { App, batch } from 'blah'
 import { Vec2 } from 'blah'
-import Game from './game'
+import { Game } from './game'
 import Input from './input'
-import { SceneTransition } from './scene1'
+import { Scene1 } from './scene1'
 
 function app(element: HTMLElement) {
 
   let game = new Game()
-
 
   App.run({
     name: 'stacksize-js2023',
     width: 1920,
     height: 1080,
     on_startup() {
-      game.init()
+      game._set_data(Vec2.zero, {
+        on_content_loaded() {
+          game.make(Scene1)
+        }
+      }).init()
     },
     on_update() {
       Input.update()

@@ -147,7 +147,7 @@ export abstract class Play {
 
 
 
-  make<T extends Play>(ctor: { new(...args: any[]): T}, position: Vec2, data: any) {
+  make<T extends Play>(ctor: { new(...args: any[]): T}, position: Vec2 = Vec2.zero, data: any = {}) {
     let res = this._make(ctor, position, data)
     this._add_object(res)
     return res

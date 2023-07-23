@@ -134,7 +134,6 @@ class DuzOkey4Hooks {
 
     let { dests } = this.okey
 
-
     sides.forEach((side, i) => 
                   this.hooks[side].on_events(povs[i], events.pov(side), dests))
     this.spec.on_events(povs[0], events.spec, dests)
