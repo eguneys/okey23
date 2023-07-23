@@ -14,11 +14,11 @@ import { Game, RectView, Clickable } from './game'
 
 import { Tween } from './tween'
 
-import { Side, Dests, Event as OkeyEvent, taslar, DuzOkey4, DuzOkey4Pov, Tas as OTas } from 'lokey'
+import { sides, Side, Dests, Event as OkeyEvent, taslar, DuzOkey4, DuzOkey4Pov, Tas as OTas } from 'lokey'
 
 import { SinglePlayerDuzOkey4, DuzOkey4PovWatcher } from './okey_hooks'
 
-import { DuzState, ChangeState, OutTas } from 'lokey'
+import { DuzState, ChangeState, OutTas, DrawTas } from 'lokey'
 
 
 class DuzOkey4PlayPlayer extends DuzOkey4PovWatcher {
@@ -43,6 +43,7 @@ let epsilon = 2
 
 type DragHook = (e: Vec2) => void
 type DropHook = () => void
+type ClickHook = () => boolean
 
 
 class Tas extends Play {
@@ -83,6 +84,30 @@ class Tas extends Play {
 
       this.rank.play_now(`l${number}`)
     }
+  }
+
+  _flipped!: boolean
+
+  get flipped() {
+    return this._flipped
+  }
+
+  set flipped(v: boolean) {
+    this._flipped = v
+
+
+    if (this._flipped) {
+      this.anim.play_now('back')
+      if (this.rank) {
+        this.rank.visible = false
+      }
+    } else {
+      this.anim.play_now('idle')
+      if (this.rank) {
+        this.rank.visible = true
+      }
+    }
+
   }
 
 
@@ -147,6 +172,11 @@ class Tas extends Play {
     this._on_hover = e
   }
 
+  _on_click?: ClickHook
+  bind_click(e?: ClickHook) {
+    this._on_click = e
+  }
+
 
 
 
@@ -199,6 +229,9 @@ class Tas extends Play {
   }
 
   _init() {
+
+    this._flipped = false
+
     this.anim = this.make(Anim, Vec2.zero, {
       name: 'tas_bg'
     })
@@ -207,6 +240,12 @@ class Tas extends Play {
     let self = this
     this.make(Clickable, Vec2.make(0, 0).sub(this.anim.origin), {
       rect: Rect.make(0, 0, 72, 102),
+      on_click() {
+        if (self._on_click) {
+          return self._on_click()
+        }
+        return false
+      },
       on_hover() {
         if (self._on_hover) {
           self._on_hover[0]()
@@ -264,6 +303,13 @@ class Tas extends Play {
   }
 
   release() {
+    this.lerp_position()
+    this.unset_dragging()
+
+    this.bind_drag(undefined)
+    this.bind_drop(undefined)
+    this.bind_hover(undefined)
+    this.bind_click(undefined)
   }
 }
 
@@ -353,7 +399,7 @@ class TasStackPositioner {
     return [[current_x, new_x], ...res]
   }
 
-  place(x: number = this.width / 2) {
+  place(x: number = this.s_width / 2) {
     return this.resolve_overlap(x, x)
   }
 
@@ -382,6 +428,18 @@ class TasStack extends Play {
   taslar!: Tas[]
 
   p1!: TasStackPositioner
+
+
+  sync_release_taslar() {
+    let res = this.taslar
+
+    this.taslar = []
+    this.p1 = 
+      new TasStackPositioner(72, 72 * 16)
+
+    this.hide_ghost()
+    return res
+  }
 
   _init() {
 
@@ -423,6 +481,7 @@ class TasStack extends Play {
   make_ghost(tas: Tas) {
     this.p1.remove(tas.position.sub(this.p_position).x)
     this.taslar.splice(this.taslar.indexOf(tas), 1)
+    tas.bind_click()
     this._ghost.visible = true
     this._ghost.position = Vec2.copy(tas.position)
   }
@@ -430,8 +489,8 @@ class TasStack extends Play {
   count_on_drag(v: Vec2) {
   }
 
-  add_tas(tas: Tas, i: Vec2) {
-    let _ = this.p1.place(i.x)
+  add_tas(tas: Tas, i?: Vec2) {
+    let _ = this.p1.place(i?.x)
     if (!_) {
       return false
     }
@@ -444,6 +503,11 @@ class TasStack extends Play {
 
     tas.bind_drag((e: Vec2) => {
       this.data.on_front_drag(this, tas, e)
+    })
+
+    tas.bind_click(() => {
+      tas.flipped = !tas.flipped
+      return true
     })
 
     rest.forEach(([x, new_x]) => {
@@ -467,6 +531,7 @@ class TasStack extends Play {
 
 class DragTas extends Play {
 
+  middle?: true
   side?: true
   _stack?: TasStack
 
@@ -490,6 +555,9 @@ class DragTas extends Play {
     this._tas.set_dragging()
   }
 
+  sync_release_taslar() {
+    return [this._tas]
+  }
 
   drag(v: Vec2) {
     let _ = this._tas
@@ -646,6 +714,14 @@ class OutWaste extends Play {
 
   taslar!: Tas[]
 
+  sync_release_taslar() {
+    let res = this.taslar
+
+    this.taslar = []
+
+    return res
+  }
+
   _init() {
     this.taslar = []
   }
@@ -657,7 +733,7 @@ class OutWaste extends Play {
 }
 
 type OutWastesData = {
-  on_drag_side: (tas: Tas, v: Vec2) => void
+  on_drag_side: (tas: Tas, v: Vec2) => boolean
 }
 
 class OutWastes extends Play {
@@ -675,6 +751,11 @@ class OutWastes extends Play {
       this.make(OutWaste, Vec2.zero, {}),
       this.make(OutWaste, Vec2.zero, {})
     ]
+  }
+
+  sync_release_taslar() {
+    return sides.flatMap(side => 
+    this.wastes[side - 1].sync_release_taslar())
   }
 
   add_tas(side: Side, tas: Tas, cancel?: true) {
@@ -703,9 +784,86 @@ class OutWastes extends Play {
         previous.bind_drag()
       }
       tas.bind_drag((e) => {
-        this.data.on_drag_side(tas, e)
+        if (this.data.on_drag_side(tas, e)) {
+          this.wastes[3].taslar.pop()
+        }
       })
     }
+  }
+}
+
+type MiddleDrawData = {
+  on_middle_drag: (tas: Tas, e: Vec2) => boolean
+}
+
+class MiddleDraw extends Play {
+
+  get data() {
+    return this._data as MiddleDrawData
+  }
+
+  tas?: Tas
+  tas2?: Tas
+
+  _init() {
+  }
+
+  sync_release_taslar() {
+
+    let res = []
+
+    if (this.tas) {
+      res.push(this.tas)
+    }
+
+    if (this.tas2) {
+      res.push(this.tas2)
+    }
+
+    this.tas = undefined
+    this.tas2 = undefined
+    return res
+  }
+
+  draw_tas(tas3?: Tas) {
+    let tas = this.tas2
+
+    if (tas) {
+      this.tas = tas
+      this.tas.position = Vec2.copy(this.p_position)
+      this.tas.flipped = true
+
+      let self = this
+      this.tas.bind_drag((e: Vec2) => {
+        if (self.data.on_middle_drag(self.tas!, e)) {
+
+        }
+      })
+    }
+
+
+    if (tas3) {
+      this.tas2 = tas3
+      this.tas2.position = Vec2.copy(this.p_position)
+    }
+  }
+
+  set_tas(tas: Tas, tas2?: Tas) {
+    if (tas2) {
+      this.tas2 = tas2
+      this.tas2.position = Vec2.copy(this.p_position)
+      this.tas2.flipped = true
+    }
+
+    this.tas = tas
+    this.tas.position = Vec2.copy(this.p_position)
+    this.tas.flipped = true
+
+    let self = this
+    this.tas.bind_drag((e: Vec2) => {
+      if (self.data.on_middle_drag(self.tas!, e)) {
+      }
+    })
   }
 }
 
@@ -717,13 +875,15 @@ class Okey23Play extends Play {
   stack2!: TasStack
 
   dragging?: DragTas
-
   side_dragging?: DragTas
+  middle_dragging?: DragTas
 
   turn_frames!: TurnFrames
   turn_arrows!: TurnArrows
 
   out_wastes!: OutWastes
+
+  middle_draw!: MiddleDraw
 
   _init() {
     this.make(Anim, Vec2.zero, {
@@ -740,7 +900,11 @@ class Okey23Play extends Play {
       rect: Rect.make(-10000, -10000, 100000, 100000),
       on_drop(e: Vec2, m: Vec2) {
         let i = m.mul(Game.v_screen).sub(self.g_position)
-        //.div(Vec2.make(72 * 16, 102))
+
+        if (self.middle_dragging) {
+          self.middle_force_stack_add(i)
+
+        }
         
         if (self.side_dragging) {
 
@@ -766,17 +930,46 @@ class Okey23Play extends Play {
         if (self.side_dragging) {
           self.side_dragging.drag(v)
         } else {
-          self.side_dragging = self.make(DragTas, Vec2.zero, {})
-          self.side_dragging.side = true
-          self.side_dragging.tas = tas
-          tas.ease_rotation(0)
+          if (self.can_dests_draw_side) {
+            self.side_dragging = self.make(DragTas, Vec2.zero, {})
+            self.side_dragging.side = true
+            self.side_dragging.tas = tas
+            tas.ease_rotation(0)
+            return true
+          }
         }
+        return false
+      }
+    })
+
+    this.middle_draw = this.make(MiddleDraw, Vec2.make(1085, 480), {
+      on_middle_drag(tas: Tas, v: Vec2) {
+        if (self.middle_dragging) {
+          self.middle_dragging.drag(v)
+        } else {
+          if (self.can_dests_draw_middle) {
+            self.middle_dragging = self.make(DragTas, Vec2.zero, {})
+            self.middle_dragging.middle = true
+            self.middle_dragging.tas = tas
+            tas.ease_rotation(0)
+
+            self.send('draw')
+
+            return true
+          }
+        }
+
+        return false
       }
     })
 
     this.taslar = this.make(Taslar, Vec2.zero, {})
 
+
     const on_front_drop = (stack: TasStack, i: Vec2) => {
+      if (this.middle_dragging) {
+        this.middle_force_stack_add(i)
+      }
       if (this.side_dragging) {
 
         this.side_dragging.tas.drag_release()
@@ -851,10 +1044,8 @@ class Okey23Play extends Play {
       on_drop() {
         if (self.dragging) {
 
-          let { action_side } = self._pov
-
-          if (action_side === 1 && self.dests.out) {
-
+          if (self.can_dests_out) {
+            self.dragging.stack?.hide_ghost()
             self.send(`out ${self.dragging.tas.tas}`)
 
             self.dragging.tas.drag_release()
@@ -863,7 +1054,6 @@ class Okey23Play extends Play {
             self.dragging.out_dispose()
             self.dragging = undefined
 
-
             return true
           } else {
             return false
@@ -871,6 +1061,81 @@ class Okey23Play extends Play {
         }
       }
     })
+  }
+
+  private get can_dests_draw_middle() {
+    return this._pov.action_side === 1 && this.dests.draw
+  }
+
+  private get can_dests_draw_side() {
+    return this.can_dests_draw_middle
+  }
+
+  private get can_dests_out() {
+    return this._pov.action_side === 1 && this.dests.out
+  }
+
+  private sync_release_taslar() {
+
+    let taslar = [
+      this.stack.sync_release_taslar(),
+      this.stack2.sync_release_taslar(),
+      this.out_wastes.sync_release_taslar(),
+      this.middle_draw.sync_release_taslar(),
+    ].flat()
+
+    if (this.dragging) {
+      taslar.push(
+        ...
+        this.dragging.sync_release_taslar())
+        this.dragging = undefined
+    }
+    if (this.side_dragging) {
+      taslar.push(...this.side_dragging.sync_release_taslar())
+      this.side_dragging = undefined
+    }
+    if (this.middle_dragging) {
+      taslar.push(
+        ...this.middle_dragging.sync_release_taslar())
+
+        this.middle_dragging = undefined
+    }
+
+    taslar.forEach(_ => this.taslar.release(_))
+  }
+
+  private middle_force_stack_add(v: Vec2) {
+    if (!this.middle_dragging) {
+      return
+    }
+
+    let tas = this.middle_dragging.tas, 
+      i = v.sub(tas.drag_decay)
+
+    tas.drag_release()
+
+    let res = this.stack.add_tas(tas, i) 
+    if (!res) {
+        this.stack2.add_tas(tas, i) ||
+          this.stack2.add_tas(tas) ||
+          this.stack.add_tas(tas)
+    }
+
+    if (this.nb_middle_taslar > 1) {
+      this.middle_draw.draw_tas(this.taslar.borrow())
+    } else {
+      this.middle_draw.draw_tas()
+    }
+
+
+    this.middle_dragging.dispose()
+    this.middle_dragging = undefined
+  }
+
+  private set_draw_tas(tas: OTas) {
+    if (this.middle_dragging) {
+      this.middle_dragging.tas.tas = tas
+    }
   }
 
   dests!: Dests
@@ -889,9 +1154,11 @@ class Okey23Play extends Play {
     let wastes = stacks.map(_ => _.waste)
     let states = stacks.map(_ => _.state)
 
+    this.sync_release_taslar()
 
     this.load_taslar(board)
 
+    this.middle_draw.set_tas(this.taslar.borrow(), this.taslar.borrow())
     this.turn_frames.set_turn(action_side)
   }
 
@@ -911,13 +1178,17 @@ class Okey23Play extends Play {
         e.side, 
         tas)
     }
+    if (e instanceof DrawTas) {
+      if (e.side === 1) {
+        this.set_draw_tas(e.tas!)
+      }
+    }
   }
 
 
   private load_taslar(taslar: OTas[]) {
     this.stack.add_taslar(taslar.map(_ => {
       let res = this.taslar.borrow()
-
       res.tas = _
       return res
     }))
@@ -926,16 +1197,23 @@ class Okey23Play extends Play {
 
   _pov!: DuzOkey4Pov
 
+  get nb_middle_taslar() {
+    return this._pov.nb_middle
+  }
+
   sync_check_pov(pov: DuzOkey4Pov) {
     if (!this._pov || this._pov.fen !== pov.fen) {
+      console.log('sync load pov', 
+                  this._pov?.fen, 
+                  pov.fen)
       this._pov = pov
       this.sync_load_pov()
     }
   }
 
   patch_event_pov(e: OkeyEvent) {
-    e.patch_pov(this._pov)
     this.apply_event(e)
+    e.patch_pov(this._pov)
   }
 
 
