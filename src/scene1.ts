@@ -10,7 +10,7 @@ import Content from './content'
 import { Anim } from './anim'
 import Input, { EventPosition, DragEvent } from './input'
 
-import { Game, RectView, Clickable } from './game'
+import { Game, RectView, Clickable } from './game2'
 
 import { Tween } from './tween'
 
@@ -868,7 +868,7 @@ class MiddleDraw extends Play {
 }
 
 
-class Okey23Play extends Play {
+export class Okey23Play extends Play {
 
   taslar!: Taslar
   stack!: TasStack
@@ -884,6 +884,11 @@ class Okey23Play extends Play {
   out_wastes!: OutWastes
 
   middle_draw!: MiddleDraw
+
+
+  _after_init() {
+    SinglePlayerDuzOkey4.make(DuzOkey4PlayPlayer.make(this))
+  }
 
   _init() {
     this.make(Anim, Vec2.zero, {
@@ -1061,6 +1066,9 @@ class Okey23Play extends Play {
         }
       }
     })
+
+
+    this._after_init()
   }
 
   private get can_dests_draw_middle() {
@@ -1236,10 +1244,6 @@ export class SceneTransition extends Play {
   _init() {
 
     this.current = this.make(Okey23Play, Vec2.zero, {})
-
-    SinglePlayerDuzOkey4.make(
-      DuzOkey4PlayPlayer.make(this.current as Okey23Play))
-
   }
 
   _draw(batch: Batch) {

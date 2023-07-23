@@ -1,6 +1,6 @@
 import { App, batch } from 'blah'
 import { Vec2 } from 'blah'
-import { Game } from './game'
+import Game from './game'
 import Input from './input'
 import { SceneTransition } from './scene1'
 
@@ -14,11 +14,7 @@ function app(element: HTMLElement) {
     width: 1920,
     height: 1080,
     on_startup() {
-      game._set_data(Vec2.zero, {
-        on_content_load() {
-          game.make(SceneTransition, Vec2.zero, {})
-        }
-      }).init()
+      game.init()
     },
     on_update() {
       Input.update()

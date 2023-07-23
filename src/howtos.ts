@@ -1,0 +1,117 @@
+let octopus = `
+Octopus is played with 2 52-card playing decks. Initially 54 cards are dealt to the tableu in ten piles, face down except for the top cards. The tableu piles are build down by rank. In-suit sequences can be moved together. The 50 remaining cards can be dealt to the tableu 10 at a time when none of the piles are empty.
+
+The aim of the game Octopus is to remove all cards from the table. Assembling a tableu will remove it. The tableu piles build down by rank, and in suit sequences can be moved together. 
+
+Game can be played with 
+
+  - 4 suits
+  - 2 suits
+  - 1 suit
+
+- Any card can be placed on an empty pile.
+
+The scoring system is:
+
+ - A face down card that gets turned over:  10 points
+ - All face down cards are turned over on a pile: 15 points
+ - A card sitting atop next higher card of the same suit: 2 points
+ - A completed suit removed from the tableu: 50 points
+ - Undo a move: - 20 points
+
+
+Scoring multipliers:
+
+
+- 1 suit: 1 multiplier
+- 2 suits: 2 multiplier
+- 4 suits: 3 multiplier
+
+`
+
+let solitaire = `
+Solitaire is played with a standard 52-card deck.
+A tableu of 7 piles of cards are laid, first pile contains 1 card, second pile contains 2 cards and so on. The topmost card of each pile is turned face up, the cards behind are turned face down.
+The remaining cards form the stock and are placed facedown at the upper left.
+
+The four foundations are built up by suit from Ace to King.
+The tableu piles can be built down by alternate colors.
+Every face-up card in a partial pile, or a complete pile, can be moved, as a unit, to another tableu pile on the basis of its highest card.
+Any empty piles can be filled with a King, or a pile of cards with a King.
+
+The aim of the game is to build up four stacks of cards from Ace to King for each suit, on one of the four foundations.
+
+There are different ways of dealing the stock cards to the waste depending on these two settings.
+
+Turning cards
+- Three cards: Turning three cards at once to the waste
+- One card: Turning one card at once to the waste
+
+Turning limit
+- No limit: no limit on passes through the deck.
+- 3 passes: 3 passes through the deck.
+- 1 pass: 1 pass through the deck.
+
+
+- If all face up cards in a tableu is moved, the topmost back facing card is turned over.
+- Cards in waste can be moved to a tableu or a foundation.
+- The topmost card in a foundation can be moved back to a tableu. 
+- If the stock is empty and there are cards in the waste, waste cards can be recycled back to stock if pass through the deck is allowed according to turning limit.
+- Moves can be undo with the undo button.
+
+
+The scoring system is:
+
+- waste to tableu:       5 points
+- waste to foundation:   10 points
+- tableu to foundation:  10 points
+- turn over tableu card: 5 points
+- foundation to tableu: -15 points
+- recycle waste:        -70 points
+- undo a move:          -30 points
+
+
+Scoring multipliers:
+
+- No limit: 1 multiplier
+- 3 limits: 2 multiplier
+- 1 limit:  3 multiplier
+`
+
+let fourtimes = `
+Fourtimes is played with a standard 52-card deck. There are four open cells and four open foundations. Cards are dealt face up into eight cascades. Four of which has seven cards each, and other four has six cards each. 
+The top card of each cascade begins a tableu. Tableus must be built down by alternating colors. Foundations are built up by suit from Ace to King.
+
+- Any cell card or top card of any cascade may be moved to build on a tableu, or moved to an empty cell, or to an empty cascade, or its foundation.
+- Complete or partial tableus may be moved to build on existing tableus, or moved to empty cascades.
+
+- The aim of the game is to move all cards to their foundation piles.
+
+The scoring system is:
+
+- Add a card to foundation: 10 points
+- Undo a move : -40 points
+`
+
+
+let about = `
+A hobby project, created in 2023 by [eguneys]"https://eguneys.github.io".
+
+A fun way to pass time with 3 solitaire games. [Solitaire]"https://en.wikipedia.org/wiki/Klondike_(solitaire)", [Fourtimes]"https://en.wikipedia.org/wiki/FreeCell", and [Octopus]"https://en.wikipedia.org/wiki/Spider_(solitaire)".
+
+- This project is free and open source at [Github]"https://github.com/eguneys/solitaire23"
+- Other games will be linked here when available.
+
+- Consider donating at [Patreon]"https://www.patreon.com/eguneys".
+
+- For business inquiries please contact me on twitter [@eguneys]"https://twitter.com/eguneys?lang=en".
+
+- Contribute translating at [Translation]"https://github.com/eguneys/solitaire23/blob/master/TRANSLATE.md"
+`
+
+export const howtos = {
+  about,
+  octopus,
+  solitaire,
+  fourtimes
+}
