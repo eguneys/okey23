@@ -885,6 +885,42 @@ class MiddleDraw extends Play {
   }
 }
 
+type OkeyShowData = {
+  on_okey_drop: () => void
+}
+
+class OkeyShow extends Play {
+
+  get data() {
+    return this._data as OkeyShowData
+  }
+
+  _tas?: Tas
+
+  _init() {}
+
+
+  sync_release_taslar() {
+    let res = []
+    
+    if (this._tas) {
+      res.push(this._tas)
+      this._tas = undefined
+    }
+      return res
+  }
+
+  set_okey(tas: Tas) {
+    this._tas = tas
+    tas.ease_position(this.p_position)
+
+    let self = this
+    tas.bind_drop(() => {
+      self.data.on_okey_drop()
+    })
+  }
+}
+
 
 export class Okey23Play extends Play {
 
@@ -902,6 +938,8 @@ export class Okey23Play extends Play {
   out_wastes!: OutWastes
 
   middle_draw!: MiddleDraw
+
+  okey_show!: OkeyShow
 
 
   _after_init() {
@@ -967,6 +1005,14 @@ export class Okey23Play extends Play {
 
 
     this.taslar = this.make(Taslar, Vec2.zero, {})
+
+
+    this.okey_show = this.make(OkeyShow, Vec2.make(1185, 480), {
+      on_okey_drop() {
+        console.log('here')
+      }
+    })
+
 
     this.middle_draw = this.make(MiddleDraw, Vec2.make(1085, 480), {
       on_middle_drag(tas: Tas, v: Vec2) {
@@ -1113,6 +1159,7 @@ export class Okey23Play extends Play {
       this.stack2.sync_release_taslar(),
       this.out_wastes.sync_release_taslar(),
       this.middle_draw.sync_release_taslar(),
+      this.okey_show.sync_release_taslar()
     ].flat()
 
     if (this.dragging) {
@@ -1189,6 +1236,10 @@ export class Okey23Play extends Play {
     this.sync_release_taslar()
 
     this.load_taslar(board)
+
+    let okey_tas = this.taslar.borrow()
+    okey_tas.tas = okey
+    this.okey_show.set_okey(okey_tas)
 
     this.middle_draw.set_tas(this.taslar.borrow(), this.taslar.borrow())
     this.turn_frames.set_turn(action_side)
